@@ -8,8 +8,10 @@ import (
 	"strings"
 )
 
+const port = ":42069"
+
 func main() {
-	ln, err := net.Listen("tcp", ":42069")
+	ln, err := net.Listen("tcp", port)
 	if err != nil {
 		fmt.Println("Error while listening: ", err)
 		return
