@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -8,32 +9,44 @@ import (
 )
 
 func main() {
-  file, err := os.Open("message.txt")
-  if err != nil {
-    fmt.Println("Error while opening message.txt", err)
-  }
-  defer file.Close()
+	file, err := os.Open("message.txt")
+	if err != nil {
+		fmt.Println("Error while opening message.txt", err)
+	}
+	lines := getLinesChannel(file)
+	for line := range lines {
+		fmt.Printf("read: %s\n", line)
+	}
+}
 
-  var data = make([]byte, 8)
-  currentLine := ""
-  for {
-    n, err := file.Read(data)
-    if err == io.EOF && n == 0 {
-      break
-    }
-    if err != nil {
-      fmt.Println("Error while reading message.txt", err)
-      break
-    }
-    parts := strings.Split(string(data[:n]), "\n")
-    for i := 0; i < len(parts)-1; i++ {
-      fmt.Printf("read: %s\n", currentLine + parts[i])
-      currentLine = ""
-    }
-    currentLine += parts[len(parts)-1]
-  }
+func getLinesChannel(f io.ReadCloser) <-chan string {
+	lines := make(chan string)
 
-  if len(currentLine) > 0 {
-    fmt.Printf("read: %s\n", currentLine)
-  }
+	go func() {
+		defer f.Close()
+		defer close(lines)
+	  currentLine := ""
+		for {
+			var data = make([]byte, 8)
+			n, err := f.Read(data)
+			if err != nil {
+				if currentLine > "" {
+					lines <- currentLine
+				}
+				if errors.Is(err, io.EOF) {
+					return
+				}
+				fmt.Println("Error while reading file: ", err)
+				return
+			}
+			parts := strings.Split(string(data[:n]), "\n")
+			for i := 0; i < len(parts)-1; i++ {
+				lines <- currentLine + parts[i]
+				currentLine = ""
+			}
+			currentLine += parts[len(parts)-1]
+		}
+	}()
+
+	return lines
 }
