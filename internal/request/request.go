@@ -1,9 +1,14 @@
 package request
 
 import (
-	"errors"
 	"io"
-	"strings"
+)
+
+type parserState int
+
+const (
+	initialized parserState = iota
+	done
 )
 
 type RequestLine struct {
@@ -13,50 +18,52 @@ type RequestLine struct {
 }
 
 type Request struct {
+	state       parserState
 	RequestLine RequestLine
 	// Headers     map[string]string
 	// Body        string
 }
 
+const bufferSize = 8
+
 func RequestFromReader(reader io.Reader) (*Request, error) {
-  // read entire bytes from the reader
-  reqBytes, err := io.ReadAll(reader)
-  if err != nil {
-    return nil, err
-  }
-  reqStr := string(reqBytes)
+	req := &Request{
+		RequestLine: RequestLine{},
+		state:       initialized,
+	}
 
-  // Split the request data into lines
-  lines := strings.Split(reqStr, "\r\n")
-  if len(lines) < 1 {
-    return nil, errors.New("Request is empty")
-  }
-  reqLineStr := lines[0]
+	buff := make([]byte, bufferSize, bufferSize)
+	readToIndex := 0
+	// read buffSize bytes
+	for req.state != done {
+		if len(buff) <= readToIndex {
+			t := make([]byte, (readToIndex+1)*2, (readToIndex+1)*2)
+			copy(t, buff)
+			buff = t
+		}
 
-  // Split the request line into (3) parts
-  parts := strings.Split(reqLineStr, " ")
-  if len(parts) != 3 {
-    return nil, errors.New("Invalid number of parts in request line")
-  }
+		n, err := reader.Read(buff[readToIndex:])
+		if err == io.EOF {
+			req.state = done
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+		readToIndex += n
 
-  // verify method part is all CAPS
-  if strings.ToUpper(parts[0]) != parts[0] {
-    return nil, errors.New("Invalid Method")
-  }
+		parsedN, err := req.parse(buff[:readToIndex])
+		if err != nil {
+			return nil, err
+		}
 
-  // verify the HTTP version
-  if parts[2] != "HTTP/1.1" {
-    return nil, errors.New("Only HTTP/1.1 is supported")
-  }
+		if parsedN > 0 {
+			t := make([]byte, len(buff)-parsedN, len(buff)-parsedN)
+			copy(t, buff[parsedN:])
+			buff = t
+			readToIndex -= parsedN
+		}
+	}
 
-  reqLine := RequestLine{
-    Method: parts[0],
-    RequestTarget: parts[1],
-    HttpVersion: "1.1",
-  }
-  req := &Request{
-    RequestLine: reqLine,
-  }
-
-  return req, nil
+	return req, nil
 }
