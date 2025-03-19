@@ -1,11 +1,9 @@
 package main
 
 import (
-	"errors"
 	"fmt"
-	"io"
+	"http-from-tcp/internal/request"
 	"net"
-	"strings"
 )
 
 const port = ":42069"
@@ -24,43 +22,19 @@ func main() {
 			continue
 		}
 		fmt.Printf("New Connection Accepted.\n * Remote Addr: %s\n", conn.RemoteAddr())
-		fmt.Println("Reading data...")
-		lines := getLinesChannel(conn)
-		for line := range lines {
-			fmt.Println(line)
+
+		req, err := request.RequestFromReader(conn)
+		if err != nil {
+			fmt.Println("Error while reading request: ", err)
 		}
-		fmt.Println("Connection Closed.")
+
+		fmt.Printf("Request Line: \n")
+		fmt.Printf(" - Method: %s\n", req.RequestLine.Method)
+		fmt.Printf(" - Target: %s\n", req.RequestLine.RequestTarget)
+		fmt.Printf(" - Version: %s\n", req.RequestLine.HttpVersion)
+
+    // TODO: conn close?
+    conn.Close()
+    fmt.Println("Connection Closed.")
 	}
-}
-
-func getLinesChannel(f io.ReadCloser) <-chan string {
-	lines := make(chan string)
-
-	go func() {
-		defer f.Close()
-		defer close(lines)
-		currentLine := ""
-		for {
-			var data = make([]byte, 8)
-			n, err := f.Read(data)
-			if err != nil {
-				if currentLine > "" {
-					lines <- currentLine
-				}
-				if errors.Is(err, io.EOF) {
-					return
-				}
-				fmt.Println("Error while reading file: ", err)
-				return
-			}
-			parts := strings.Split(string(data[:n]), "\n")
-			for i := 0; i < len(parts)-1; i++ {
-				lines <- currentLine + parts[i]
-				currentLine = ""
-			}
-			currentLine += parts[len(parts)-1]
-		}
-	}()
-
-	return lines
 }
