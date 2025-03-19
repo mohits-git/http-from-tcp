@@ -7,7 +7,7 @@ import (
 
 func (r *Request) parse(data []byte) (int, error) {
 	switch r.state {
-	case initialized:
+	case requestStateInitialized:
 		rl, n, err := parseRequestLine(data)
 		if err != nil {
 			return 0, err
@@ -16,9 +16,9 @@ func (r *Request) parse(data []byte) (int, error) {
 			return 0, nil
 		}
 		r.RequestLine = rl
-		r.state = done
+		r.state = requestStateDone
 		return n, nil
-	case done:
+	case requestStateDone:
 		return 0, errors.New("error: trying to read data in a done state")
 	default:
 		return 0, errors.New("error: unknown state")
