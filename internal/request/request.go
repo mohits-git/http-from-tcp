@@ -2,6 +2,7 @@ package request
 
 import (
 	"errors"
+	"http-from-tcp/internal/headers"
 	"io"
 )
 
@@ -9,6 +10,7 @@ type requestState int
 
 const (
 	requestStateInitialized requestState = iota
+	requestStateParsingHeaders
 	requestStateDone
 )
 
@@ -21,7 +23,7 @@ type RequestLine struct {
 type Request struct {
 	state       requestState
 	RequestLine RequestLine
-	// Headers     map[string]string
+	Headers     headers.Headers
 	// Body        string
 }
 
@@ -29,8 +31,9 @@ const bufferSize = 8
 
 func RequestFromReader(reader io.Reader) (*Request, error) {
 	req := &Request{
-		RequestLine: RequestLine{},
 		state:       requestStateInitialized,
+		RequestLine: RequestLine{},
+		Headers:     headers.NewHeaders(),
 	}
 
 	buff := make([]byte, bufferSize, bufferSize)
@@ -43,6 +46,7 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 			buff = t
 		}
 
+		// read chunk from buffer
 		n, err := reader.Read(buff[readToIndex:])
 		if err != nil {
 			if errors.Is(err, io.EOF) {
@@ -53,6 +57,7 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 		}
 		readToIndex += n
 
+		// parse the chunk
 		parsedN, err := req.parse(buff[:readToIndex])
 		if err != nil {
 			return nil, err

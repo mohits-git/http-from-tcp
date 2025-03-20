@@ -5,18 +5,43 @@ import (
 	"strings"
 )
 
+// Parse the request from the data buffer
 func (r *Request) parse(data []byte) (int, error) {
+	totalBytesParsed := 0
+	for r.state != requestStateDone {
+    n, err := r.parseSingle(data[totalBytesParsed:])
+		if err != nil {
+			return totalBytesParsed, err
+		}
+		if n == 0 {
+			break
+		}
+		totalBytesParsed += n
+	}
+	return totalBytesParsed, nil
+}
+
+// parseSingle parses a single peice of data (request line, single header, etc)
+func (r *Request) parseSingle(data []byte) (int, error) {
 	switch r.state {
 	case requestStateInitialized:
 		rl, n, err := parseRequestLine(data)
 		if err != nil {
 			return 0, err
 		}
-		if n == 0 {
-			return 0, nil
+		if n > 0 {
+			r.RequestLine = rl
+			r.state = requestStateParsingHeaders
 		}
-		r.RequestLine = rl
-		r.state = requestStateDone
+		return n, nil
+	case requestStateParsingHeaders:
+		n, d, err := r.Headers.Parse(data)
+		if err != nil {
+			return 0, err
+		}
+		if d {
+			r.state = requestStateDone
+		}
 		return n, nil
 	case requestStateDone:
 		return 0, errors.New("error: trying to read data in a done state")
@@ -25,6 +50,8 @@ func (r *Request) parse(data []byte) (int, error) {
 	}
 }
 
+// parse the request line from the data buffer
+// returns RequestLine struct (if parsed), number of bytes parsed (0 if not enough data yet), and an error if one occurred
 func parseRequestLine(data []byte) (RequestLine, int, error) {
 	reqChunkStr := string(data)
 	// Split the request data into lines
@@ -56,5 +83,5 @@ func parseRequestLine(data []byte) (RequestLine, int, error) {
 		RequestTarget: parts[1],
 		HttpVersion:   "1.1",
 	}
-	return reqLine, len(reqLineStr), nil
+  return reqLine, len(reqLineStr) + 2, nil // +2 for CRLF :) :) :) :) :)
 }
