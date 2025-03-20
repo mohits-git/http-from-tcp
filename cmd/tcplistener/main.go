@@ -33,8 +33,8 @@ func main() {
 		fmt.Printf(" - Target: %s\n", req.RequestLine.RequestTarget)
 		fmt.Printf(" - Version: %s\n", req.RequestLine.HttpVersion)
 
-    // TODO: conn close?
-    conn.Close()
-    fmt.Println("Connection Closed.")
+		// TODO: conn close?
+		conn.Close()
+		fmt.Println("Connection Closed.")
 	}
 }
