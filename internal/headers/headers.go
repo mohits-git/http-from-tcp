@@ -12,6 +12,12 @@ func NewHeaders() Headers {
 	return Headers{}
 }
 
+// Get() returns the value of the key (case insensitive) in the Headers map
+func (h Headers) Get(key string) (string, bool) {
+  val, ok := h[strings.ToLower(key)]
+  return val, ok
+}
+
 // Parses a single key-value pair from the data and adds it to the Headers map
 // Returns the number of bytes parsed, whether the parsing is done, and an error if one occurred
 func (h Headers) Parse(data []byte) (n int, done bool, err error) {
