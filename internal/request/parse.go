@@ -2,6 +2,8 @@ package request
 
 import (
 	"errors"
+	"http-from-tcp/internal/headers"
+	"strconv"
 	"strings"
 )
 
@@ -9,7 +11,7 @@ import (
 func (r *Request) parse(data []byte) (int, error) {
 	totalBytesParsed := 0
 	for r.state != requestStateDone {
-    n, err := r.parseSingle(data[totalBytesParsed:])
+		n, err := r.parseSingle(data[totalBytesParsed:])
 		if err != nil {
 			return totalBytesParsed, err
 		}
@@ -40,9 +42,26 @@ func (r *Request) parseSingle(data []byte) (int, error) {
 			return 0, err
 		}
 		if d {
-			r.state = requestStateDone
+			r.state = requestStateParsingBody
 		}
 		return n, nil
+	case requestStateParsingBody:
+    contentLength, ok, err := getContentLength(r.Headers)
+		if !ok {
+			r.state = requestStateDone
+			return 0, nil
+		}
+		if err != nil {
+			return 0, err
+		}
+		r.Body = append(r.Body, data...)
+		if len(r.Body) > contentLength {
+			return 0, errors.New("error: body is too long")
+		}
+		if len(r.Body) == contentLength {
+			r.state = requestStateDone
+		}
+		return len(data), nil
 	case requestStateDone:
 		return 0, errors.New("error: trying to read data in a done state")
 	default:
@@ -83,5 +102,17 @@ func parseRequestLine(data []byte) (RequestLine, int, error) {
 		RequestTarget: parts[1],
 		HttpVersion:   "1.1",
 	}
-  return reqLine, len(reqLineStr) + 2, nil // +2 for CRLF :) :) :) :) :)
+	return reqLine, len(reqLineStr) + 2, nil // +2 for CRLF :) :) :) :) :)
+}
+
+func getContentLength(headers headers.Headers) (int, bool, error) {
+		contentLengthStr, ok := headers.Get("content-length")
+		if !ok {
+			return 0, ok, nil
+		}
+		contentLength, err := strconv.Atoi(contentLengthStr)
+		if err != nil {
+			return 0, ok, err
+		}
+    return contentLength, ok, nil
 }

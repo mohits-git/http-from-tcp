@@ -11,6 +11,7 @@ type requestState int
 const (
 	requestStateInitialized requestState = iota
 	requestStateParsingHeaders
+	requestStateParsingBody
 	requestStateDone
 )
 
@@ -24,7 +25,7 @@ type Request struct {
 	state       requestState
 	RequestLine RequestLine
 	Headers     headers.Headers
-	// Body        string
+	Body        []byte
 }
 
 const bufferSize = 8
@@ -34,6 +35,7 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 		state:       requestStateInitialized,
 		RequestLine: RequestLine{},
 		Headers:     headers.NewHeaders(),
+		Body:        []byte{},
 	}
 
 	buff := make([]byte, bufferSize, bufferSize)
@@ -50,7 +52,6 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 		n, err := reader.Read(buff[readToIndex:])
 		if err != nil {
 			if errors.Is(err, io.EOF) {
-				req.state = requestStateDone
 				break
 			}
 			return nil, err
@@ -70,6 +71,26 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 			readToIndex -= parsedN
 		}
 	}
+
+  // check if the request is done
+	if req.state != requestStateDone {
+		return nil, errors.New("error: incomplete request")
+	}
+
+  // reverfiy body parsing
+  contentLength, ok, err := getContentLength(req.Headers)
+  if err != nil {
+    return nil, err
+  }
+  if ok {
+    _, err := reader.Read(buff)
+    if !errors.Is(err, io.EOF) {
+      return nil, errors.New("error: body is too long")
+    }
+    if len(req.Body) != contentLength {
+      return nil, errors.New("error: body is too long")
+    }
+  }
 
 	return req, nil
 }
