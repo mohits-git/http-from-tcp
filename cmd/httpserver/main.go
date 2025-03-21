@@ -14,10 +14,8 @@ import (
 const port = 42069
 
 func requestHandler(w response.Writer, req *request.Request) {
-	var resBody string
+	var resBody []byte
 	var statusCode response.StatusCode
-	headers := response.GetDefaultHeaders(len(resBody))
-	headers.Set("Content-Type", "text/html")
 
 	if strings.HasPrefix(req.RequestLine.RequestTarget, "/httpbin/") {
 		proxyHandler(w, req)
@@ -25,9 +23,12 @@ func requestHandler(w response.Writer, req *request.Request) {
 	}
 
 	switch req.RequestLine.RequestTarget {
+	case "/video":
+		handleVideoResponse(w, req)
+		return
 	case "/yourproblem":
 		statusCode = response.StatusCodeBadRequest
-		resBody = `<html>
+		resBody = []byte(`<html>
   <head>
     <title>400 Bad Request</title>
   </head>
@@ -35,10 +36,10 @@ func requestHandler(w response.Writer, req *request.Request) {
     <h1>Bad Request</h1>
     <p>Your request honestly kinda sucked.</p>
   </body>
-</html>`
+</html>`)
 	case "/myproblem":
 		statusCode = response.StatusCodeInternalServerError
-		resBody = `<html>
+		resBody = []byte(`<html>
   <head>
     <title>500 Internal Server Error</title>
   </head>
@@ -46,10 +47,10 @@ func requestHandler(w response.Writer, req *request.Request) {
     <h1>Internal Server Error</h1>
     <p>Okay, you know what? This one is on me.</p>
   </body>
-</html>`
+</html>`)
 	default:
 		statusCode = response.StatusCodeOK
-		resBody = `<html>
+		resBody = []byte(`<html>
   <head>
     <title>200 OK</title>
   </head>
@@ -57,7 +58,7 @@ func requestHandler(w response.Writer, req *request.Request) {
     <h1>Success!</h1>
     <p>Your request was an absolute banger.</p>
   </body>
-</html>`
+</html>`)
 	}
 
 	// write response:
@@ -66,12 +67,14 @@ func requestHandler(w response.Writer, req *request.Request) {
 		log.Printf("Failed to write status line: %v\n", err)
 		return
 	}
+	headers := response.GetDefaultHeaders(len(resBody))
+	headers.Set("Content-Type", "text/html")
 	err = w.WriteHeaders(headers)
 	if err != nil {
 		log.Printf("Failed to write headers: %v\n", err)
 		return
 	}
-	err = w.WriteBody([]byte(resBody))
+	err = w.WriteBody(resBody)
 	if err != nil {
 		log.Printf("Failed to write body: %v\n", err)
 		return
