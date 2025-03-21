@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 )
 
@@ -15,6 +16,13 @@ const port = 42069
 func requestHandler(w response.Writer, req *request.Request) {
 	var resBody string
 	var statusCode response.StatusCode
+	headers := response.GetDefaultHeaders(len(resBody))
+	headers.Set("Content-Type", "text/html")
+
+	if strings.HasPrefix(req.RequestLine.RequestTarget, "/httpbin/") {
+		proxyHandler(w, req)
+		return
+	}
 
 	switch req.RequestLine.RequestTarget {
 	case "/yourproblem":
@@ -51,9 +59,6 @@ func requestHandler(w response.Writer, req *request.Request) {
   </body>
 </html>`
 	}
-
-	headers := response.GetDefaultHeaders(len(resBody))
-	headers.Set("Content-Type", "text/html")
 
 	// write response:
 	err := w.WriteStatusLine(statusCode)
