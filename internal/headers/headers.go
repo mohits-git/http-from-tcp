@@ -18,6 +18,25 @@ func (h Headers) Get(key string) (string, bool) {
   return val, ok
 }
 
+// Add() sets the value of the key (case insensitive) in the Headers map (if the key exists, it appends the value)
+func (h Headers) Add(key, val string) {
+  existingVal, exist := h[strings.ToLower(key)]
+  if exist {
+    val = existingVal + ", " + val
+  }
+  h[strings.ToLower(key)] = val
+}
+
+// Set() sets the value of the key (case insensitive) in the Headers map (if the key exists, it overwrites the value)
+func (h Headers) Set(key, val string) {
+  h[strings.ToLower(key)] = val
+}
+
+// Delete() deletes the key (case insensitive) from the Headers map
+func (h Headers) Delete(key string) {
+  delete(h, strings.ToLower(key))
+}
+
 // Parses a single key-value pair from the data and adds it to the Headers map
 // Returns the number of bytes parsed, whether the parsing is done, and an error if one occurred
 func (h Headers) Parse(data []byte) (n int, done bool, err error) {
