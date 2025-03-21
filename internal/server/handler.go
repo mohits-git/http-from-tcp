@@ -3,18 +3,21 @@ package server
 import (
 	"http-from-tcp/internal/request"
 	"http-from-tcp/internal/response"
-	"io"
+	"log"
 )
 
 type HandlerError struct {
-  StatusCode response.StatusCode
-  Message string
+	StatusCode response.StatusCode
+	Message    string
 }
 
-type Handler func(w io.Writer, req *request.Request) *HandlerError
+type Handler func(w response.Writer, req *request.Request)
 
-func (hErr *HandlerError) Write(w io.Writer) {
-  response.WriteStatusLine(w, hErr.StatusCode)
-  response.WriteHeaders(w, response.GetDefaultHeaders(len(hErr.Message)))
-  w.Write([]byte(hErr.Message))
+func (hErr *HandlerError) Write(w response.Writer) {
+	err := w.WriteStatusLine(hErr.StatusCode)
+	err = w.WriteHeaders(response.GetDefaultHeaders(len(hErr.Message)))
+	err = w.WriteBody([]byte(hErr.Message))
+	if err != nil {
+		log.Println("Error while writing error response: ", err)
+	}
 }

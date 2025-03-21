@@ -4,7 +4,6 @@ import (
 	"http-from-tcp/internal/request"
 	"http-from-tcp/internal/response"
 	"http-from-tcp/internal/server"
-	"io"
 	"log"
 	"os"
 	"os/signal"
@@ -13,28 +12,65 @@ import (
 
 const port = 42069
 
-func requestHandler(w io.Writer, req *request.Request) *server.HandlerError {
-	if req.RequestLine.RequestTarget == "/yourproblem" {
-		return &server.HandlerError{
-			StatusCode: response.StatusCodeBadRequest,
-			Message:    "Your problem is not my problem\n",
-		}
+func requestHandler(w response.Writer, req *request.Request) {
+	var resBody string
+	var statusCode response.StatusCode
+
+	switch req.RequestLine.RequestTarget {
+	case "/yourproblem":
+		statusCode = response.StatusCodeBadRequest
+		resBody = `<html>
+  <head>
+    <title>400 Bad Request</title>
+  </head>
+  <body>
+    <h1>Bad Request</h1>
+    <p>Your request honestly kinda sucked.</p>
+  </body>
+</html>`
+	case "/myproblem":
+		statusCode = response.StatusCodeInternalServerError
+		resBody = `<html>
+  <head>
+    <title>500 Internal Server Error</title>
+  </head>
+  <body>
+    <h1>Internal Server Error</h1>
+    <p>Okay, you know what? This one is on me.</p>
+  </body>
+</html>`
+	default:
+		statusCode = response.StatusCodeOK
+		resBody = `<html>
+  <head>
+    <title>200 OK</title>
+  </head>
+  <body>
+    <h1>Success!</h1>
+    <p>Your request was an absolute banger.</p>
+  </body>
+</html>`
 	}
-	if req.RequestLine.RequestTarget == "/myproblem" {
-		return &server.HandlerError{
-			StatusCode: response.StatusCodeInternalServerError,
-			Message:    "Woopsie, my bad\n",
-		}
-	}
-	_, err := w.Write([]byte("All good, frfr\n"))
+
+	headers := response.GetDefaultHeaders(len(resBody))
+	headers.Set("Content-Type", "text/html")
+
+	// write response:
+	err := w.WriteStatusLine(statusCode)
 	if err != nil {
-		log.Printf("Failed to write response: %v\n", err)
-		return &server.HandlerError{
-			StatusCode: response.StatusCodeInternalServerError,
-			Message:    "Failed to write response\n",
-		}
+		log.Printf("Failed to write status line: %v\n", err)
+		return
 	}
-	return nil
+	err = w.WriteHeaders(headers)
+	if err != nil {
+		log.Printf("Failed to write headers: %v\n", err)
+		return
+	}
+	err = w.WriteBody([]byte(resBody))
+	if err != nil {
+		log.Printf("Failed to write body: %v\n", err)
+		return
+	}
 }
 
 func main() {

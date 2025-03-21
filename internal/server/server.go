@@ -1,7 +1,6 @@
 package server
 
 import (
-	"bytes"
 	"fmt"
 	"http-from-tcp/internal/request"
 	"http-from-tcp/internal/response"
@@ -57,30 +56,15 @@ func (s *Server) listen() {
 func (s *Server) handle(conn net.Conn) {
 	defer conn.Close()
 	// parse req
+	responseWriter := response.Writer{Writer: conn}
 	req, err := request.RequestFromReader(conn)
 	if err != nil {
 		hErr := HandlerError{
 			StatusCode: response.StatusCodeBadRequest,
 			Message:    "Bad Request",
 		}
-		hErr.Write(conn)
+		hErr.Write(responseWriter)
 		return
 	}
-
-	// call user handler
-	buf := bytes.NewBuffer([]byte{})
-	handlerErr := s.handler(buf, req)
-	if handlerErr != nil {
-		handlerErr.Write(conn)
-		return
-	}
-
-	// write response (ok, if no handler error)
-	err = response.WriteStatusLine(conn, response.StatusCodeOK)
-	headers := response.GetDefaultHeaders(buf.Len())
-	err = response.WriteHeaders(conn, headers)
-	_, err = conn.Write(buf.Bytes())
-	if err != nil {
-		log.Println("Error while writing body: ", err)
-	}
+	s.handler(responseWriter, req)
 }
